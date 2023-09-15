@@ -5,7 +5,7 @@ import Heading from '../../../../admin-x-ds/global/Heading';
 import Icon from '../../../../admin-x-ds/global/Icon';
 import Modal from '../../../../admin-x-ds/global/modal/Modal';
 import NiceModal, {useModal} from '@ebay/nice-modal-react';
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import Select from '../../../../admin-x-ds/global/form/Select';
 import SortableList from '../../../../admin-x-ds/global/SortableList';
 import TextField from '../../../../admin-x-ds/global/form/TextField';
@@ -15,21 +15,18 @@ import useForm from '../../../../hooks/useForm';
 import useRouting from '../../../../hooks/useRouting';
 import useSettingGroup from '../../../../hooks/useSettingGroup';
 import useSortableIndexedList from '../../../../hooks/useSortableIndexedList';
-import {Tier, useAddTier, useEditTier} from '../../../../api/tiers';
+import {RoutingModalProps} from '../../../providers/RoutingProvider';
+import {Tier, useAddTier, useBrowseTiers, useEditTier} from '../../../../api/tiers';
 import {currencies, currencySelectGroups, validateCurrencyAmount} from '../../../../utils/currency';
 import {getSettingValues} from '../../../../api/settings';
 import {showToast} from '../../../../admin-x-ds/global/Toast';
 import {toast} from 'react-hot-toast';
 
-interface TierDetailModalProps {
-    tier?: Tier
-}
-
 export type TierFormState = Partial<Omit<Tier, 'trial_days'>> & {
     trial_days: string;
 };
 
-const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
+const TierDetailModalContent: React.FC<{tier?: Tier}> = ({tier}) => {
     const isFreeTier = tier?.type === 'free';
 
     const modal = useModal();
@@ -97,9 +94,15 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
         }
     };
 
+    // Only validate amounts when the user changes currency, don't show errors on initial render
+    const didInitialRender = useRef(false);
     useEffect(() => {
-        validators.monthly_price();
-        validators.yearly_price();
+        if (didInitialRender.current) {
+            validators.monthly_price();
+            validators.yearly_price();
+        }
+
+        didInitialRender.current = true;
     }, [formState.currency]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return <Modal
@@ -118,9 +121,14 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
             if (Object.values(validators).filter(validator => validator()).length) {
                 showToast({
                     type: 'pageError',
-                    message: 'Can\'t save tier! One or more fields have errors, please doublecheck you filled all mandatory fields'
+                    message: 'Can\'t save tier, please double check that you\'ve filled all mandatory fields.'
                 });
                 return;
+            }
+
+            if (saveState !== 'unsaved') {
+                updateRoute('tiers');
+                modal.remove();
             }
 
             if (await handleSave()) {
@@ -148,7 +156,7 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                         value={formState.description || ''}
                         onChange={e => updateForm(state => ({...state, description: e.target.value}))}
                     />
-                    {!isFreeTier && <div className='flex gap-10'>
+                    {!isFreeTier && <div className='flex flex-col gap-10 md:flex-row'>
                         <div className='basis-1/2'>
                             <div className='mb-1 flex h-6 items-center justify-between'>
                                 <Heading level={6}>Prices</Heading>
@@ -170,7 +178,7 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                                     placeholder='1'
                                     rightPlaceholder={`${formState.currency}/month`}
                                     title='Monthly price'
-                                    valueInCents={formState.monthly_price || 0}
+                                    valueInCents={formState.monthly_price || ''}
                                     hideTitle
                                     onBlur={() => validators.monthly_price()}
                                     onChange={price => updateForm(state => ({...state, monthly_price: price}))}
@@ -181,7 +189,7 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                                     placeholder='10'
                                     rightPlaceholder={`${formState.currency}/year`}
                                     title='Yearly price'
-                                    valueInCents={formState.yearly_price || 0}
+                                    valueInCents={formState.yearly_price || ''}
                                     hideTitle
                                     onBlur={() => validators.yearly_price()}
                                     onChange={price => updateForm(state => ({...state, yearly_price: price}))}
@@ -194,9 +202,9 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                             </div>
                             <TextField
                                 disabled={!hasFreeTrial}
-                                hint={<>
-                                    Members will be subscribed at full price once the trial ends. <a href="https://ghost.org/" rel="noreferrer" target="_blank">Learn more</a>
-                                </>}
+                                hint={<div className='mt-1'>
+                                    Members will be subscribed at full price once the trial ends. <a className='text-green' href="https://ghost.org/" rel="noreferrer" target="_blank">Learn more</a>
+                                </div>}
                                 placeholder='0'
                                 rightPlaceholder='days'
                                 title='Trial days'
@@ -227,7 +235,7 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                         />
                     </div>
                     <div className="relative mt-0.5 flex items-center gap-3">
-                        <Icon name='check' size='sm' />
+                        <Icon className='dark:text-white' name='check' size='sm' />
                         <TextField
                             className='grow'
                             containerClassName='w-100'
@@ -236,6 +244,11 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                             value={benefits.newItem}
                             hideTitle
                             onChange={e => benefits.setNewItem(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    benefits.addItem();
+                                }
+                            }}
                         />
                         <Button
                             className='absolute right-0 top-1'
@@ -250,11 +263,27 @@ const TierDetailModal: React.FC<TierDetailModalProps> = ({tier}) => {
                     </div>
                 </Form>
             </div>
-            <div className='sticky top-[94px] shrink-0 basis-[380px]'>
+            <div className='sticky top-[94px] hidden shrink-0 basis-[380px] min-[920px]:!visible min-[920px]:!block'>
                 <TierDetailPreview isFreeTier={isFreeTier} tier={formState} />
             </div>
         </div>
     </Modal>;
+};
+
+const TierDetailModal: React.FC<RoutingModalProps> = ({params}) => {
+    const {data: {tiers} = {}} = useBrowseTiers();
+
+    let tier: Tier | undefined;
+
+    if (params?.id) {
+        tier = tiers?.find(({id}) => id === params?.id);
+
+        if (!tier) {
+            return;
+        }
+    }
+
+    return <TierDetailModalContent tier={tier} />;
 };
 
 export default NiceModal.create(TierDetailModal);

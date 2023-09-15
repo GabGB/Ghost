@@ -10,7 +10,7 @@ import TableRow from '../../../../admin-x-ds/global/TableRow';
 import useRouting from '../../../../hooks/useRouting';
 import {HostLimitError, useLimiter} from '../../../../hooks/useLimiter';
 import {Newsletter, useEditNewsletter} from '../../../../api/newsletters';
-import {modalRoutes} from '../../../providers/RoutingProvider';
+import {numberWithCommas} from '../../../../utils/helpers';
 
 interface NewslettersListProps {
     newsletters: Newsletter[]
@@ -22,7 +22,7 @@ const NewsletterItem: React.FC<{newsletter: Newsletter, onlyOne: boolean}> = ({n
     const limiter = useLimiter();
 
     const action = newsletter.status === 'active' ? (
-        <Button color='green' disabled={onlyOne} label='Archive' link onClick={() => {
+        <Button color='red' disabled={onlyOne} label='Archive' link onClick={() => {
             NiceModal.show(ConfirmationModal, {
                 title: 'Archive newsletter',
                 prompt: <>
@@ -66,7 +66,7 @@ const NewsletterItem: React.FC<{newsletter: Newsletter, onlyOne: boolean}> = ({n
     );
 
     const showDetails = () => {
-        updateRoute({route: modalRoutes.showNewsletter, params: {id: newsletter.id}});
+        updateRoute({route: `newsletters/show/${newsletter.id}`});
     };
 
     return (
@@ -77,16 +77,16 @@ const NewsletterItem: React.FC<{newsletter: Newsletter, onlyOne: boolean}> = ({n
                     <span className='whitespace-nowrap text-xs text-grey-700'>{newsletter.description || 'No description'}</span>
                 </div>
             </TableCell>
-            <TableCell onClick={showDetails}>
+            <TableCell className='hidden md:!visible md:!table-cell' onClick={showDetails}>
                 <div className={`flex grow flex-col`}>
-                    <span>{newsletter.count?.active_members}</span>
+                    <span>{numberWithCommas(newsletter.count?.active_members || 0) }</span>
                     <span className='whitespace-nowrap text-xs text-grey-700'>Subscribers</span>
                 </div>
             </TableCell>
-            <TableCell onClick={showDetails}>
+            <TableCell className='hidden md:!visible md:!table-cell' onClick={showDetails}>
                 <div className={`flex grow flex-col`}>
-                    <span>{newsletter.count?.posts}</span>
-                    <span className='whitespace-nowrap text-xs text-grey-700'>Posts sent</span>
+                    <span>{numberWithCommas(newsletter.count?.posts || 0)}</span>
+                    <span className='whitespace-nowrap text-xs text-grey-700'>Delivered</span>
                 </div>
             </TableCell>
         </TableRow>

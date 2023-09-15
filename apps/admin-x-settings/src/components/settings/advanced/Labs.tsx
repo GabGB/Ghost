@@ -41,10 +41,10 @@ const Labs: React.FC<{ keywords: string[] }> = ({keywords}) => {
                     <SettingGroupHeader description='This is a testing ground for new or experimental features. They may change, break or inexplicably disappear at any time.' title='Labs' />
                     {
                         !isOpen ?
-                            <Button color='green' label='Open' link onClick={() => {
+                            <Button color='green' label='Open' link linkWithPadding onClick={() => {
                                 setIsOpen(true);
                             }} /> :
-                            <Button color='green' label='Close' link onClick={() => {
+                            <Button color='green' label='Close' link linkWithPadding onClick={() => {
                                 setIsOpen(false);
                             }} />
                     }
@@ -59,7 +59,7 @@ const Labs: React.FC<{ keywords: string[] }> = ({keywords}) => {
                 <TabView<'labs-migration-options' | 'labs-alpha-features' | 'labs-beta-features'> selectedTab={selectedTab} tabs={tabs} onTabChange={setSelectedTab} />
                 :
                 <div className='absolute inset-0 z-0 overflow-hidden opacity-70'>
-                    <img className='absolute -right-6 -top-6' src={LabsBubbles} />
+                    <img className='absolute -right-6 -top-6 dark:opacity-10' src={LabsBubbles} />
                 </div>
             }
         </SettingGroup>

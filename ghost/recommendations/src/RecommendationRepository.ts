@@ -1,9 +1,18 @@
-import {Recommendation} from "./Recommendation";
+import {OrderOption} from '@tryghost/bookshelf-repository';
+import {Recommendation} from './Recommendation';
 
 export interface RecommendationRepository {
-    add(recommendation: Recommendation): Promise<Recommendation>
-    edit(id: string, data: Partial<Recommendation>): Promise<Recommendation>
-    remove(id: string): Promise<void>
-    getById(id: string): Promise<Recommendation>
-    getAll(): Promise<Recommendation[]>
+    save(entity: Recommendation): Promise<void>;
+    getById(id: string): Promise<Recommendation | null>;
+    getByUrl(url: URL): Promise<Recommendation | null>;
+    getAll({filter, order}?: {filter?: string, order?: OrderOption<Recommendation>}): Promise<Recommendation[]>;
+    getPage({filter, order, page, limit}: {
+        filter?: string;
+        order?: OrderOption<Recommendation>;
+        page: number;
+        limit: number;
+    }): Promise<Recommendation[]>;
+    getCount({filter}?: {
+        filter?: string;
+    }): Promise<number>;
 };

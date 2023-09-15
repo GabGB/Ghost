@@ -1,12 +1,16 @@
+import ColorPickerField from '../../../../admin-x-ds/global/form/ColorPickerField';
 import Heading from '../../../../admin-x-ds/global/Heading';
 import Hint from '../../../../admin-x-ds/global/Hint';
 import ImageUpload from '../../../../admin-x-ds/global/form/ImageUpload';
 import React, {useRef, useState} from 'react';
 import SettingGroupContent from '../../../../admin-x-ds/settings/SettingGroupContent';
 import TextField from '../../../../admin-x-ds/global/form/TextField';
+import usePinturaEditor from '../../../../hooks/usePinturaEditor';
 import {SettingValue} from '../../../../api/settings';
 import {debounce} from '../../../../utils/debounce';
 import {getImageUrl, useUploadImage} from '../../../../api/images';
+import {getSettingValues} from '../../../../api/settings';
+import {useGlobalData} from '../../../providers/GlobalDataProvider';
 
 export interface BrandSettingValues {
     description: string
@@ -19,6 +23,10 @@ export interface BrandSettingValues {
 const BrandSettings: React.FC<{ values: BrandSettingValues, updateSetting: (key: string, value: SettingValue) => void }> = ({values,updateSetting}) => {
     const {mutateAsync: uploadImage} = useUploadImage();
     const [siteDescription, setSiteDescription] = useState(values.description);
+    const {settings} = useGlobalData();
+    const [pintura] = getSettingValues<boolean>(settings, ['pintura']);
+    const [pinturaJsUrl] = getSettingValues<string>(settings, ['pintura_js_url']);
+    const [pinturaCssUrl] = getSettingValues<string>(settings, ['pintura_css_url']);
 
     const updateDescriptionDebouncedRef = useRef(
         debounce((value: string) => {
@@ -26,6 +34,18 @@ const BrandSettings: React.FC<{ values: BrandSettingValues, updateSetting: (key:
         }, 500)
     );
     const updateSettingDebounced = debounce(updateSetting, 500);
+
+    const pinturaEnabled = Boolean(pintura) && Boolean(pinturaJsUrl) && Boolean(pinturaCssUrl);
+
+    const editor = usePinturaEditor(
+        {config: {
+            jsUrl: pinturaJsUrl || '',
+            cssUrl: pinturaCssUrl || ''
+        },
+        disabled: !pinturaEnabled}
+    );
+
+    // check if pintura !false and pintura_js_url and pintura_css_url are not '' or null or undefined
 
     return (
         <div className='mt-7'>
@@ -43,22 +63,13 @@ const BrandSettings: React.FC<{ values: BrandSettingValues, updateSetting: (key:
                         updateDescriptionDebouncedRef.current(event.target.value);
                     }}
                 />
-                <div className='flex items-center justify-between gap-3'>
-                    <Heading grey={true} level={6}>Accent color</Heading>
-                    <div className='relative max-w-[70px]'>
-                        {/* <span className='absolute left-1 top-[9px] text-grey-600'>#</span> */}
-                        <TextField
-                            key='accent-color'
-                            className='text-right'
-                            clearBg={true}
-                            maxLength={7}
-                            type='color'
-                            value={values.accentColor}
-                            // we debounce this because the color picker fires a lot of events.
-                            onChange={event => updateSettingDebounced('accent_color', event.target.value)}
-                        />
-                    </div>
-                </div>
+                <ColorPickerField
+                    direction='rtl'
+                    title={<Heading className='mt-[3px]' grey={true} level={6}>Accent color</Heading>}
+                    value={values.accentColor}
+                    // we debounce this because the color picker fires a lot of events.
+                    onChange={value => updateSettingDebounced('accent_color', value)}
+                />
                 <div className={`flex justify-between ${values.icon ? 'items-start ' : 'items-end'}`}>
                     <div>
                         <Heading grey={(values.icon ? true : false)} level={6}>Publication icon</Heading>
@@ -67,6 +78,7 @@ const BrandSettings: React.FC<{ values: BrandSettingValues, updateSetting: (key:
                     <div className='flex gap-3'>
                         <ImageUpload
                             deleteButtonClassName='!top-1 !right-1'
+                            editButtonClassName='!top-1 !right-1'
                             height={values.icon ? '66px' : '36px'}
                             id='logo'
                             imageBWCheckedBg={true}
@@ -102,9 +114,21 @@ const BrandSettings: React.FC<{ values: BrandSettingValues, updateSetting: (key:
                     <Heading className='mb-2' grey={(values.coverImage ? true : false)} level={6}>Publication cover</Heading>
                     <ImageUpload
                         deleteButtonClassName='!top-1 !right-1'
+                        editButtonClassName='!top-1 !right-10'
                         height='180px'
                         id='cover'
                         imageURL={values.coverImage || ''}
+                        pintura={
+                            {
+                                isEnabled: pinturaEnabled,
+                                openEditor: async () => editor.openEditor({
+                                    image: values.coverImage || '',
+                                    handleSave: async (file:File) => {
+                                        updateSetting('cover_image', getImageUrl(await uploadImage({file})));
+                                    }
+                                })
+                            }
+                        }
                         onDelete={() => updateSetting('cover_image', null)}
                         onUpload={async (file) => {
                             updateSetting('cover_image', getImageUrl(await uploadImage({file})));

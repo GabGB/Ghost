@@ -1,5 +1,6 @@
 const should = require('should');
 const assert = require('assert/strict');
+const DomainEvents = require('@tryghost/domain-events');
 const {agentProvider, fixtureManager, mockManager, matchers} = require('../../utils/e2e-framework');
 const {anyArray, anyContentVersion, anyEtag, anyErrorId, anyLocationFor, anyObject, anyObjectId, anyISODateTime, anyString, anyStringNumber, anyUuid, stringMatching} = matchers;
 const models = require('../../../core/server/models');
@@ -312,6 +313,50 @@ describe('Posts API', function () {
             mobiledocRevisions.length.should.equal(0);
         });
 
+        it('Can create a post with html', async function () {
+            mockManager.mockLabsDisabled('lexicalEditor');
+
+            const post = {
+                title: 'HTML test',
+                html: '<p>Testing post creation with html</p>'
+            };
+
+            await agent
+                .post('/posts/?source=html&formats=mobiledoc,lexical,html')
+                .body({posts: [post]})
+                .expectStatus(201)
+                .matchBodySnapshot({
+                    posts: [Object.assign({}, matchPostShallowIncludes, {published_at: null})]
+                })
+                .matchHeaderSnapshot({
+                    'content-version': anyContentVersion,
+                    etag: anyEtag,
+                    location: anyLocationFor('posts')
+                });
+        });
+
+        it('Can create a post with html (labs.lexicalEditor)', async function () {
+            mockManager.mockLabsEnabled('lexicalEditor');
+
+            const post = {
+                title: 'HTML test',
+                html: '<p>Testing post creation with html</p>'
+            };
+
+            await agent
+                .post('/posts/?source=html&formats=mobiledoc,lexical,html')
+                .body({posts: [post]})
+                .expectStatus(201)
+                .matchBodySnapshot({
+                    posts: [Object.assign({}, matchPostShallowIncludes, {published_at: null})]
+                })
+                .matchHeaderSnapshot({
+                    'content-version': anyContentVersion,
+                    etag: anyEtag,
+                    location: anyLocationFor('posts')
+                });
+        });
+
         it('Errors if both mobiledoc and lexical are present', async function () {
             const post = {
                 title: 'Mobiledoc+lexical test',
@@ -538,7 +583,7 @@ describe('Posts API', function () {
                             // collectionToRemove
                             collectionMatcher,
                             // automatic "latest" collection which cannot be removed
-                            buildCollectionMatcher(18)
+                            buildCollectionMatcher(20)
                         ]})]
                 })
                 .matchHeaderSnapshot({
@@ -556,7 +601,7 @@ describe('Posts API', function () {
                             // collectionToAdd
                             collectionMatcher,
                             // automatic "latest" collection which cannot be removed
-                            buildCollectionMatcher(18)
+                            buildCollectionMatcher(20)
                         ]})]
                 })
                 .matchHeaderSnapshot({
@@ -595,6 +640,34 @@ describe('Posts API', function () {
                     }]
                 });
         });
+
+        it('Can delete posts belonging to a collection and returns empty response when filtering by that collection', async function () {
+            const res = await agent.get('posts/?collection=featured')
+                .expectStatus(200)
+                .matchHeaderSnapshot({
+                    'content-version': anyContentVersion,
+                    etag: anyEtag
+                })
+                .matchBodySnapshot({
+                    posts: new Array(2).fill(matchPostShallowIncludes)
+                });
+
+            const posts = res.body.posts;
+
+            await agent.delete(`posts/${posts[0].id}/`).expectStatus(204);
+            await agent.delete(`posts/${posts[1].id}/`).expectStatus(204);
+
+            await DomainEvents.allSettled();
+
+            await agent
+                .get(`posts/?collection=featured`)
+                .expectStatus(200)
+                .matchHeaderSnapshot({
+                    'content-version': anyContentVersion,
+                    etag: anyEtag
+                })
+                .matchBodySnapshot();
+        });
     });
 
     describe('Copy', function () {
@@ -630,7 +703,7 @@ describe('Posts API', function () {
     });
 
     describe('Convert', function () {
-        it('can convert a mobiledoc post to lexical', async function () { 
+        it('can convert a mobiledoc post to lexical', async function () {
             const mobiledoc = createMobiledoc('This is some great content.');
             const expectedLexical = createLexical('This is some great content.');
             const postData = {

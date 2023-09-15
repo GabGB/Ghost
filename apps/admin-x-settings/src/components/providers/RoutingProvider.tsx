@@ -1,23 +1,6 @@
-import AddIntegrationModal from '../settings/advanced/integrations/AddIntegrationModal';
-import AddNewsletterModal from '../settings/email/newsletters/AddNewsletterModal';
-import AddRecommendationModal from '../settings/site/recommendations/AddRecommendationModal';
-import AddRecommendationModalConfirm from '../settings/site/recommendations/AddRecommendationModalConfirm';
-import AmpModal from '../settings/advanced/integrations/AmpModal';
-import ChangeThemeModal from '../settings/site/ThemeModal';
-import DesignModal from '../settings/site/DesignModal';
-import FirstpromoterModal from '../settings/advanced/integrations/FirstPromoterModal';
-import HistoryModal from '../settings/advanced/HistoryModal';
-import InviteUserModal from '../settings/general/InviteUserModal';
-import NavigationModal from '../settings/site/NavigationModal';
-import NiceModal from '@ebay/nice-modal-react';
-import PinturaModal from '../settings/advanced/integrations/PinturaModal';
-import PortalModal from '../settings/membership/portal/PortalModal';
-import React, {createContext, useCallback, useEffect, useRef, useState} from 'react';
-import SlackModal from '../settings/advanced/integrations/SlackModal';
-import StripeConnectModal from '../settings/membership/stripe/StripeConnectModal';
-import TierDetailModal from '../settings/membership/tiers/TierDetailModal';
-import UnsplashModal from '../settings/advanced/integrations/UnsplashModal';
-import ZapierModal from '../settings/advanced/integrations/ZapierModal';
+import NiceModal, {NiceModalHocProps} from '@ebay/nice-modal-react';
+import React, {createContext, useCallback, useEffect, useState} from 'react';
+import {ScrollSectionProvider} from '../../hooks/useScrollSection';
 
 export type RouteParams = {[key: string]: string}
 
@@ -30,35 +13,74 @@ export type ExternalLink = {
 export type InternalLink = {
     isExternal?: false;
     route: string;
-    params?: RouteParams;
 }
 
 export type RoutingContextData = {
     route: string;
-    scrolledRoute: string;
-    yScroll: number;
     updateRoute: (to: string | InternalLink | ExternalLink) => void;
-    updateScrolled: (newPath: string) => void;
-    addRouteChangeListener: (listener: RouteChangeListener) => (() => void);
+    loadingModal: boolean;
 };
 
 export const RouteContext = createContext<RoutingContextData>({
     route: '',
-    scrolledRoute: '',
-    yScroll: 0,
     updateRoute: () => {},
-    updateScrolled: () => {},
-    addRouteChangeListener: () => (() => {})
+    loadingModal: false
 });
 
-// These routes need to be handled by a SettingGroup (or other component) with the
-// useDetailModalRoute hook. The idea is that those components will open a modal after
-// loading any data required for the route
-export const modalRoutes = {
-    showUser: 'users/show/:slug',
-    showNewsletter: 'newsletters/show/:id',
-    showTier: 'tiers/show/:id',
-    showIntegration: 'integrations/show/:id'
+export type RoutingModalProps = {
+    params?: Record<string, string>
+}
+
+const AddIntegrationModal = () => import('../settings/advanced/integrations/AddIntegrationModal');
+const AddNewsletterModal = () => import('../settings/email/newsletters/AddNewsletterModal');
+const AddRecommendationModal = () => import('../settings/site/recommendations/AddRecommendationModal');
+const AmpModal = () => import('../settings/advanced/integrations/AmpModal');
+const ChangeThemeModal = () => import('../settings/site/ThemeModal');
+const CustomIntegrationModal = () => import('../settings/advanced/integrations/CustomIntegrationModal');
+const DesignModal = () => import('../settings/site/DesignModal');
+const EditRecommendationModal = () => import('../settings/site/recommendations/EditRecommendationModal');
+const FirstpromoterModal = () => import('../settings/advanced/integrations/FirstPromoterModal');
+const HistoryModal = () => import('../settings/advanced/HistoryModal');
+const InviteUserModal = () => import('../settings/general/InviteUserModal');
+const NavigationModal = () => import('../settings/site/NavigationModal');
+const NewsletterDetailModal = () => import('../settings/email/newsletters/NewsletterDetailModal');
+const PinturaModal = () => import('../settings/advanced/integrations/PinturaModal');
+const PortalModal = () => import('../settings/membership/portal/PortalModal');
+const SlackModal = () => import('../settings/advanced/integrations/SlackModal');
+const StripeConnectModal = () => import('../settings/membership/stripe/StripeConnectModal');
+const TierDetailModal = () => import('../settings/membership/tiers/TierDetailModal');
+const UnsplashModal = () => import('../settings/advanced/integrations/UnsplashModal');
+const UserDetailModal = () => import('../settings/general/UserDetailModal');
+const ZapierModal = () => import('../settings/advanced/integrations/ZapierModal');
+const AnnouncementBarModal = () => import('../settings/site/AnnouncementBarModal');
+const EmbedSignupFormModal = () => import('../settings/membership/embedSignup/EmbedSignupFormModal');
+
+const modalPaths: {[key: string]: () => Promise<{default: React.FC<NiceModalHocProps & RoutingModalProps>}>} = {
+    'design/edit/themes': ChangeThemeModal,
+    'design/edit': DesignModal,
+    'navigation/edit': NavigationModal,
+    'users/invite': InviteUserModal,
+    'users/show/:slug': UserDetailModal,
+    'portal/edit': PortalModal,
+    'tiers/add': TierDetailModal,
+    'tiers/show/:id': TierDetailModal,
+    'stripe-connect': StripeConnectModal,
+    'newsletters/add': AddNewsletterModal,
+    'newsletters/show/:id': NewsletterDetailModal,
+    'history/view': HistoryModal,
+    'history/view/:user': HistoryModal,
+    'integrations/zapier': ZapierModal,
+    'integrations/slack': SlackModal,
+    'integrations/amp': AmpModal,
+    'integrations/unsplash': UnsplashModal,
+    'integrations/firstpromoter': FirstpromoterModal,
+    'integrations/pintura': PinturaModal,
+    'integrations/add': AddIntegrationModal,
+    'integrations/show/:id': CustomIntegrationModal,
+    'recommendations/add': AddRecommendationModal,
+    'recommendations/:id': EditRecommendationModal,
+    'announcement-bar/edit': AnnouncementBarModal,
+    'embed-signup-form/show': EmbedSignupFormModal
 };
 
 function getHashPath(urlPath: string | undefined) {
@@ -75,85 +97,38 @@ function getHashPath(urlPath: string | undefined) {
     return null;
 }
 
-const scrollToSectionGroup = (pathName: string) => {
-    const element = document.getElementById(pathName);
-    if (element) {
-        element.scrollIntoView({behavior: 'smooth'});
-    }
-};
-
-const handleNavigation = (scroll: boolean = true) => {
+const handleNavigation = () => {
     // Get the hash from the URL
     let hash = window.location.hash;
-
-    // Remove the leading '#' character from the hash
     hash = hash.substring(1);
 
-    // Get the path name from the hash
-    const pathName = getHashPath(hash);
+    // Create a URL to easily extract the path without query parameters
+    const domain = `${window.location.protocol}//${window.location.hostname}`;
+    let url = new URL(hash, domain);
+
+    const pathName = getHashPath(url.pathname);
 
     if (pathName) {
-        if (pathName === 'design/edit/themes') {
-            NiceModal.show(ChangeThemeModal);
-        } else if (pathName === 'design/edit') {
-            NiceModal.show(DesignModal);
-        } else if (pathName === 'navigation/edit') {
-            NiceModal.show(NavigationModal);
-        } else if (pathName === 'users/invite') {
-            NiceModal.show(InviteUserModal);
-        } else if (pathName === 'portal/edit') {
-            NiceModal.show(PortalModal);
-        } else if (pathName === 'tiers/add') {
-            NiceModal.show(TierDetailModal);
-        } else if (pathName === 'stripe-connect') {
-            NiceModal.show(StripeConnectModal);
-        } else if (pathName === 'newsletters/add') {
-            NiceModal.show(AddNewsletterModal);
-        } else if (pathName === 'history/view') {
-            NiceModal.show(HistoryModal);
-        } else if (pathName === 'integrations/zapier') {
-            NiceModal.show(ZapierModal);
-        } else if (pathName === 'integrations/slack') {
-            NiceModal.show(SlackModal);
-        } else if (pathName === 'integrations/amp') {
-            NiceModal.show(AmpModal);
-        } else if (pathName === 'integrations/unsplash') {
-            NiceModal.show(UnsplashModal);
-        } else if (pathName === 'integrations/firstpromoter') {
-            NiceModal.show(FirstpromoterModal);
-        } else if (pathName === 'integrations/pintura') {
-            NiceModal.show(PinturaModal);
-        } else if (pathName === 'integrations/add') {
-            NiceModal.show(AddIntegrationModal);
-        } else if (pathName === 'recommendations/add') {
-            NiceModal.show(AddRecommendationModal);
-        } else if (pathName === 'recommendations/add-confirm') {
-            NiceModal.show(AddRecommendationModalConfirm);
-        }
+        const [path, modal] = Object.entries(modalPaths).find(([modalPath]) => matchRoute(pathName, modalPath)) || [];
 
-        if (scroll) {
-            scrollToSectionGroup(pathName);
-        }
-
-        return pathName;
+        return {
+            pathName,
+            modal: (path && modal) ? 
+                modal().then(({default: component}) => {
+                    NiceModal.show(component, {params: matchRoute(pathName, path)});
+                }) :
+                undefined
+        };
     }
-    return '';
+    return {pathName: ''};
 };
 
 const matchRoute = (pathname: string, routeDefinition: string) => {
-    const regex = new RegExp(routeDefinition.replace(/:(\w+)/, '(?<$1>[^/]+)'));
-
-    return pathname.match(regex)?.groups;
-};
-
-const callRouteChangeListeners = (newPath: string, listeners: RouteChangeListener[]) => {
-    listeners.forEach((listener) => {
-        const params = matchRoute(newPath, listener.route);
-
-        if (params) {
-            listener.callback(params);
-        }
-    });
+    const regex = new RegExp('^' + routeDefinition.replace(/:(\w+)/, '(?<$1>[^/]+)') + '$');
+    const match = pathname.match(regex);
+    if (match) {
+        return match.groups || {};
+    }
 };
 
 type RouteProviderProps = {
@@ -161,16 +136,16 @@ type RouteProviderProps = {
     children: React.ReactNode;
 };
 
-type RouteChangeListener = {
-    route: string;
-    callback: (params: RouteParams) => void;
-}
-
 const RoutingProvider: React.FC<RouteProviderProps> = ({externalNavigate, children}) => {
-    const [route, setRoute] = useState<string>('');
-    const [yScroll, setYScroll] = useState(0);
-    const [scrolledRoute, setScrolledRoute] = useState<string>('');
-    const routeChangeListeners = useRef<RouteChangeListener[]>([]);
+    const [route, setRoute] = useState<string | undefined>(undefined);
+    const [loadingModal, setLoadingModal] = useState(false);
+
+    useEffect(() => {
+        // Preload all the modals after initial render to avoid a delay when opening them
+        setTimeout(() => {
+            Object.values(modalPaths).forEach(modal => modal());
+        }, 1000);
+    }, []);
 
     const updateRoute = useCallback((to: string | InternalLink | ExternalLink) => {
         const options = typeof to === 'string' ? {route: to} : to;
@@ -180,79 +155,50 @@ const RoutingProvider: React.FC<RouteProviderProps> = ({externalNavigate, childr
             return;
         }
 
-        let newPath = options.route;
-
-        if (options.params) {
-            newPath = Object.entries(options.params).reduce(
-                (path, [name, value]) => path.replace(`:${name}`, value),
-                newPath
-            );
-        }
+        const newPath = options.route;
 
         if (newPath) {
-            if (newPath === route) {
-                scrollToSectionGroup(newPath);
-            } else {
-                window.location.hash = `/settings-x/${newPath}`;
-            }
+            window.location.hash = `/settings-x/${newPath}`;
         } else {
             window.location.hash = `/settings-x`;
         }
-    }, [externalNavigate, route]);
-
-    const updateScrolled = useCallback((newPath: string) => {
-        setScrolledRoute(newPath);
-    }, []);
+    }, [externalNavigate]);
 
     useEffect(() => {
         const handleHashChange = () => {
-            const matchedRoute = handleNavigation();
-            setRoute(matchedRoute);
-            callRouteChangeListeners(matchedRoute, routeChangeListeners.current);
+            const {pathName, modal} = handleNavigation();
+            setRoute(pathName);
+
+            if (modal) {
+                setLoadingModal(true);
+                modal.then(() => setLoadingModal(false));
+            }
         };
 
-        const handleScroll = () => {
-            const element = document.getElementById('admin-x-root');
-            const scrollPosition = element!.scrollTop;
-            setYScroll(scrollPosition);
-        };
-
-        const element = document.getElementById('admin-x-root');
-        const matchedRoute = handleNavigation();
-        setRoute(matchedRoute);
-        callRouteChangeListeners(matchedRoute, routeChangeListeners.current);
-        element!.addEventListener('scroll', handleScroll);
+        handleHashChange();
 
         window.addEventListener('hashchange', handleHashChange);
 
         return () => {
-            element!.removeEventListener('scroll', handleScroll);
             window.removeEventListener('hashchange', handleHashChange);
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const addRouteChangeListener = useCallback((listener: RouteChangeListener) => {
-        if (route && !routeChangeListeners.current.some(current => current.route === listener.route)) {
-            callRouteChangeListeners(route, [listener]);
-        }
-
-        routeChangeListeners.current = [...routeChangeListeners.current, listener];
-
-        return () => routeChangeListeners.current = routeChangeListeners.current.filter(current => current !== listener);
-    }, [route]);
+    if (route === undefined) {
+        return null;
+    }
 
     return (
         <RouteContext.Provider
             value={{
                 route,
-                scrolledRoute,
-                yScroll,
                 updateRoute,
-                updateScrolled,
-                addRouteChangeListener
+                loadingModal
             }}
         >
-            {children}
+            <ScrollSectionProvider navigatedSection={route.split('/')[0]}>
+                {children}
+            </ScrollSectionProvider>
         </RouteContext.Provider>
     );
 };

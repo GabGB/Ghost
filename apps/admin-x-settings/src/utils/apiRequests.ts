@@ -1,6 +1,8 @@
+import handleResponse from './handleResponse';
 import {QueryClient, UseInfiniteQueryOptions, UseQueryOptions, useInfiniteQuery, useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {getGhostPaths} from './helpers';
 import {useMemo} from 'react';
+import {usePage, usePagination} from '../hooks/usePagination';
 import {useServices} from '../components/providers/ServiceProvider';
 
 export interface Meta {
@@ -20,27 +22,7 @@ interface RequestOptions {
     headers?: {
         'Content-Type'?: string;
     };
-}
-
-export class ApiError extends Error {
-    constructor(
-        public readonly response: Response,
-        public readonly data?: {
-            errors?: Array<{
-                code: string | null;
-                context: string | null;
-                details: string | null;
-                ghostErrorCode: string | null;
-                help: string | null;
-                id: string;
-                message: string;
-                property: string | null;
-                type: string;
-            }>
-        }
-    ) {
-        super(data?.errors?.[0]?.message || response.statusText);
-    }
+    credentials?: 'include' | 'omit' | 'same-origin';
 }
 
 export const useFetchApi = () => {
@@ -67,16 +49,7 @@ export const useFetchApi = () => {
             ...options
         });
 
-        if (response.status > 299) {
-            const data = response.headers.get('content-type')?.includes('application/json') ? await response.json() : undefined;
-            throw new ApiError(response, data);
-        } else if (response.status === 204) {
-            return;
-        } else if (response.headers.get('content-type')?.includes('text/csv')) {
-            return await response.text();
-        } else {
-            return await response.json();
-        }
+        return handleResponse(response);
     };
 };
 
@@ -119,6 +92,41 @@ export const createQuery = <ResponseData>(options: QueryOptions<ResponseData>) =
     return {
         ...result,
         data
+    };
+};
+
+export const createPaginatedQuery = <ResponseData extends {meta?: Meta}>(options: QueryOptions<ResponseData>) => ({searchParams, ...query}: QueryHookOptions<ResponseData> = {}) => {
+    const {page, setPage} = usePage();
+    const limit = (searchParams?.limit || options.defaultSearchParams?.limit) ? parseInt(searchParams?.limit || options.defaultSearchParams?.limit || '15') : 15;
+
+    const paginatedSearchParams = searchParams || options.defaultSearchParams || {};
+    paginatedSearchParams.page = page.toString();
+
+    const url = apiUrl(options.path, paginatedSearchParams);
+    const fetchApi = useFetchApi();
+
+    const result = useQuery<ResponseData>({
+        queryKey: [options.dataType, url],
+        queryFn: () => fetchApi(url),
+        ...query
+    });
+
+    const data = useMemo(() => (
+        (result.data && options.returnData) ? options.returnData(result.data) : result.data)
+    , [result]);
+
+    const pagination = usePagination({
+        page,
+        setPage,
+        limit,
+        // Don't pass the meta data if we are fetching, because then it is probably out of date and this causes issues
+        meta: result.isFetching ? undefined : data?.meta
+    });
+
+    return {
+        ...result,
+        data,
+        pagination
     };
 };
 

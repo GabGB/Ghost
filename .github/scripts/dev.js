@@ -41,7 +41,7 @@ const COMMAND_ADMIN = {
 
 const COMMAND_TYPESCRIPT = {
     name: 'ts',
-    command: 'nx watch --projects=ghost/collections,ghost/in-memory-repository,ghost/mail-events,ghost/model-to-domain-event-interceptor,ghost/post-revisions,ghost/nql-filter-expansions,ghost/post-events,ghost/donations,ghost/recommendations -- nx run \\$NX_PROJECT_NAME:build:ts',
+    command: 'nx watch --projects=ghost/collections,ghost/in-memory-repository,ghost/bookshelf-repository,ghost/mail-events,ghost/model-to-domain-event-interceptor,ghost/post-revisions,ghost/nql-filter-expansions,ghost/post-events,ghost/donations,ghost/recommendations -- nx run \\$NX_PROJECT_NAME:build:ts',
     cwd: path.resolve(__dirname, '../../'),
     prefixColor: 'cyan',
     env: {}
@@ -71,9 +71,9 @@ if (DASH_DASH_ARGS.includes('admin-x') || DASH_DASH_ARGS.includes('adminx') || D
         //    https://localhost:41740 {
         //        reverse_proxy http://localhost:4174
         //    }
-        COMMAND_GHOST.env['adminX__url'] = 'https://localhost:41740/admin-x-settings.umd.js';
+        COMMAND_GHOST.env['adminX__url'] = 'https://localhost:41740/admin-x-settings.js';
     } else {
-        COMMAND_GHOST.env['adminX__url'] = 'http://localhost:4174/admin-x-settings.umd.js';
+        COMMAND_GHOST.env['adminX__url'] = 'http://localhost:4174/admin-x-settings.js';
     }
 }
 

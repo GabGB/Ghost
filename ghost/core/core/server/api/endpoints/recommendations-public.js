@@ -9,16 +9,55 @@ module.exports = {
         },
         options: [
             'limit',
-            'fields',
-            'filter',
             'order',
-            'debug',
             'page'
         ],
         permissions: true,
         validation: {},
-        async query() {
-            return await recommendations.controller.listRecommendations();
+        async query(frame) {
+            return await recommendations.controller.listRecommendations(frame);
+        }
+    },
+
+    trackClicked: {
+        headers: {
+            cacheInvalidate: false
+        },
+        options: [
+            'id'
+        ],
+        validation: {
+            options: {
+                id: {
+                    required: true
+                }
+            }
+        },
+        permissions: true,
+        statusCode: 204,
+        async query(frame) {
+            await recommendations.controller.trackClicked(frame);
+        }
+    },
+
+    trackSubscribed: {
+        headers: {
+            cacheInvalidate: false
+        },
+        options: [
+            'id'
+        ],
+        validation: {
+            options: {
+                id: {
+                    required: true
+                }
+            }
+        },
+        permissions: true,
+        statusCode: 204,
+        async query(frame) {
+            await recommendations.controller.trackSubscribed(frame);
         }
     }
 };
